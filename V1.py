@@ -1,3 +1,5 @@
+!git clone https://github.com/dirty-cat/dirty_cat.git
+
 from pathlib import Path
 
 import numpy as np
@@ -5,13 +7,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sklearn
 import holidays
-import osmnx as ox
-import geopandas as gpd
-from shapely.geometry import Point
 
-data = pd.read_parquet(Path("data") / "train.parquet") # import train 
-
-meteo = pd.read_csv(Path("data") / "external_data.csv") # import meteo 
+data = pd.read_parquet("../input/msdb-2024/train.parquet")
+test = pd.read_parquet("../input/msdb-2024/final_test.parquet") # import test 
 
 # 1. Handle Missing Data
 # Check for missing values
@@ -84,8 +82,7 @@ y = data['log_bike_count']
 # train-test split
 from sklearn.model_selection import train_test_split
 
-data_train, data_test, target_train, target_test = train_test_split(
-    X, y, random_state=2408)
+#data_train, data_test, target_train, target_test = train_test_split(X, y, random_state=2408)
 
 import pandas as pd
 import numpy as np
@@ -99,8 +96,8 @@ from dirty_cat import TableVectorizer
 from sklearn.pipeline import make_pipeline
 
 # Select only numerical features
-data_train_num = data_train.select_dtypes(include="number")
-data_train_cat = data_train.select_dtypes(include="object")
+X_num = X.select_dtypes(include="number")
+#data_train_cat = data_train.select_dtypes(include="object")
 
 # store parameters to test in a dictionnary
 param_grid = {'max_depth': range(10, 15), 
@@ -114,7 +111,7 @@ dtr_model = DecisionTreeRegressor(random_state=2408)
 grid_search = GridSearchCV(dtr_model, param_grid=param_grid, n_jobs=4, cv=5, return_train_score=True)
 
 # fit GridSearchCV
-grid_search.fit(data_train_num, target_train) # REGLER CE PB, TU PRENDS QUE LES NUMERIQUES
+grid_search.fit(X_num, y) # REGLER CE PB, TU PRENDS QUE LES NUMERIQUES
 
 # get the best max_depth
 best_max_depth = grid_search.best_params_['max_depth']
@@ -122,6 +119,22 @@ best_split = grid_search.best_params_['min_samples_split']
 best_leaf = grid_search.best_params_['min_samples_leaf']
 
 print(best_max_depth, best_split, best_leaf)
+
+
+# DEFINE PIPELINES and test RMSE - WITHOUT SCALER
+
+# Pipeline
+pipeline_no_scaler_dtr = make_pipeline(TableVectorizer(),
+    DecisionTreeRegressor(max_depth=best_max_depth,min_samples_split=best_split,min_samples_leaf=best_leaf)
+)
+
+# RMSE Without scaler
+pipeline_no_scaler_dtr.fit(X, y)
+#target_pred_no_scaler = pipeline_no_scaler_dtr.predict(data_test)
+#rmse_no_scaler = mean_squared_error(target_test, target_pred_no_scaler, squared=False)
+#print(f"RMSE without scaler: {rmse_no_scaler}")
+
+
 
 # DEFINE PIPELINES and test RMSE - WITH SCALER
 
@@ -144,14 +157,18 @@ pipeline_scaler_dtr = make_pipeline(
 )
 
 # RMSE with scaler
-pipeline_scaler_dtr.fit(data_train, target_train)
+pipeline_scaler_dtr.fit(X, y)
 
 # predict
-target_pred_scaler = pipeline_scaler_dtr.predict(data_test)
-rmse_scaler = mean_squared_error(target_test, target_pred_scaler, squared=False)
-print(f"RMSE with scaler: {rmse_scaler}")
+#target_pred_scaler = pipeline_scaler_dtr.predict(data_test)
+#rmse_scaler = mean_squared_error(target_test, target_pred_scaler, squared=False)
+#print(f"RMSE with scaler: {rmse_scaler}")
 
-test = pd.read_parquet(Path("data") / "final_test.parquet") # import test 
+
+
+
+
+
 
 # 1. Convert `date` column to datetime type
 test['date'] = pd.to_datetime(test['date'])
